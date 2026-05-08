@@ -651,17 +651,77 @@ let items = [];
 let settings = { initialShelf: 0 };
 let currentTab = 'unlisted';
 let editingPhotos = [];   // 編集モーダル内の写真配列（参照渡し用）
+let photosCache = {};     // { itemId: [base64, ...] } — IndexedDBの写真キャッシュ
+
+// ══════════════════════════════════════════
+//  IndexedDB（写真専用・容量制限ほぼなし）
+// ══════════════════════════════════════════
+const IDB_NAME  = 'kiririn_photos_db';
+const IDB_STORE = 'photos';
+
+function openPhotoDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+    req.onsuccess  = e => resolve(e.target.result);
+    req.onerror    = e => reject(e.target.error);
+  });
+}
+async function savePhotos(itemId, photos) {
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(photos, itemId);
+    tx.oncomplete = resolve;
+    tx.onerror    = e => reject(e.target.error);
+  });
+}
+async function deletePhotos(itemId) {
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(itemId);
+    tx.oncomplete = resolve;
+    tx.onerror    = e => reject(e.target.error);
+  });
+}
+async function loadAllPhotosToCache() {
+  try {
+    const db = await openPhotoDB();
+    return new Promise(resolve => {
+      const tx  = db.transaction(IDB_STORE, 'readonly');
+      const cur = tx.objectStore(IDB_STORE).openCursor();
+      cur.onsuccess = e => {
+        const c = e.target.result;
+        if (c) { photosCache[c.key] = c.value; c.continue(); }
+        else resolve();
+      };
+      cur.onerror = () => resolve();
+    });
+  } catch(e) { /* IndexedDB不可環境では無視 */ }
+}
 
 function loadData() {
   const raw = localStorage.getItem('kiririn_items');
   items = raw ? JSON.parse(raw) : [];
+  let needsSave = false;
   // マイグレーション: 旧 "stock" → "unlisted"、photo → photos[]
+  // さらに photos[] をlocalStorageから取り出してIndexedDBへ移行
   items = items.map(x => {
     if (x.status === 'stock') x.status = 'unlisted';
     if (!x.photos) { x.photos = x.photo ? [x.photo] : []; }
     delete x.photo;
+    // 写真がlocalStorageに残っていたらキャッシュへ移してIndexedDBに非同期保存
+    if (x.photos && x.photos.length) {
+      photosCache[x.id] = x.photos;
+      savePhotos(x.id, x.photos); // 非同期・fire-and-forget
+      delete x.photos;
+      needsSave = true;
+    }
     return x;
   });
+  // 写真を抜いた軽いデータで上書き保存
+  if (needsSave) localStorage.setItem('kiririn_items', JSON.stringify(items));
 }
 
 function loadSettings() {
@@ -673,11 +733,7 @@ function save() {
   try {
     localStorage.setItem('kiririn_items', JSON.stringify(items));
   } catch (e) {
-    if (e.name === 'QuotaExceededError' || e.code === 22) {
-      alert('⚠️ 保存に失敗しました\n\n容量が上限に達しています。\n\n【対処方法】\n・写真の枚数を減らしてみてください\n・設定 → データ管理 → JSONバックアップ後\n  古い販売済み商品を削除してください');
-    } else {
-      alert('⚠️ 保存に失敗しました: ' + e.message);
-    }
+    alert('⚠️ 保存に失敗しました: ' + e.message);
   }
   render();
 }
@@ -770,14 +826,14 @@ function renderStats() {
   document.getElementById('dataSummary').textContent   =
     `全 ${items.length} 件 / 棚在庫設定 ${initialShelf} 件（残 ${remainingShelf} 件）`;
 
-  // 容量チェック（iPhoneは~5MB上限）
+  // 容量チェック（写真はIndexedDBなので商品テキストのみ）
   try {
     const usedKB = Math.round(
       (localStorage.getItem('kiririn_items') || '').length * 2 / 1024
     );
+    const photoCount = Object.keys(photosCache).length;
     const el = document.getElementById('dataSummary');
-    const warn = usedKB > 3000 ? ' ⚠️容量注意' : '';
-    el.textContent += ` / 使用容量 ${usedKB}KB${warn}`;
+    el.textContent += ` / テキスト容量 ${usedKB}KB（写真 ${photoCount}件は別保存）`;
   } catch(e) {}
 }
 
@@ -805,10 +861,11 @@ function renderList() {
   }
 
   box.innerHTML = list.map(x => {
-    const src   = x.photos && x.photos.length ? x.photos[0] : '';
-    const img   = src ? `<img src="${src}" />` : '<span>No<br>Image</span>';
-    const multi = x.photos && x.photos.length > 1
-      ? `<span style="font-size:11px;color:var(--muted)">📷${x.photos.length}</span>` : '';
+    const photos = photosCache[x.id] || [];
+    const src    = photos.length ? photos[0] : '';
+    const img    = src ? `<img src="${src}" />` : '<span>No<br>Image</span>';
+    const multi  = photos.length > 1
+      ? `<span style="font-size:11px;color:var(--muted)">📷${photos.length}</span>` : '';
 
     const badge = `<span class="badge ${x.status}">${STATUS_LABEL[x.status]}</span>`;
     const targetStr = x.targetPrice ? ` / 希望 ${yen(x.targetPrice)}` : '';
@@ -941,15 +998,21 @@ async function addItem() {
     ? new Date(purchaseDateVal + 'T00:00:00').toISOString()
     : new Date().toISOString();
 
+  const id = String(Date.now());
+  // 写真はIndexedDB＋キャッシュへ（localStorageには入れない）
+  if (photos.length) {
+    photosCache[id] = photos;
+    await savePhotos(id, photos);
+  }
+
   items.unshift({
-    id:          String(Date.now()),
+    id,
     status,
     name:        document.getElementById('addName').value.trim(),
     store:       document.getElementById('addStore').value.trim(),
     cost:        Number(document.getElementById('addCost').value        || 0),
     targetPrice: Number(document.getElementById('addTargetPrice').value || 0) || null,
     fromShelf:   document.getElementById('addFromShelf').checked,
-    photos,
     measurements: getMeasurements('add'),
     createdAt,
     listedAt:  status === 'listed' ? new Date().toISOString() : null,
@@ -1024,7 +1087,7 @@ function sellItem() {
 function openEditModal(id) {
   const item = items.find(x => x.id === id);
   if (!item) return;
-  editingPhotos = [...(item.photos || [])];
+  editingPhotos = [...(photosCache[id] || [])];
 
   document.getElementById('editId').value           = id;
   document.getElementById('editPurchaseDate').value = toDateInput(item.createdAt);
@@ -1095,7 +1158,9 @@ async function saveEdit() {
   item.cost         = Number(document.getElementById('editCost').value        || 0);
   item.targetPrice  = Number(document.getElementById('editTargetPrice').value || 0) || null;
   item.fromShelf    = document.getElementById('editFromShelf').checked;
-  item.photos       = [...editingPhotos];
+  // 写真はIndexedDB＋キャッシュへ更新
+  photosCache[item.id] = [...editingPhotos];
+  savePhotos(item.id, [...editingPhotos]); // 非同期・fire-and-forget
   item.measurements = getMeasurements('edit');
   item.status       = newStatus;
 
@@ -1126,6 +1191,8 @@ function deleteItem() {
   const name = item ? (item.name || '無題の商品') : '';
   if (!confirm(`「${name}」を削除しますか？\nこの操作は元に戻せません。`)) return;
   items = items.filter(x => x.id !== id);
+  delete photosCache[id];
+  deletePhotos(id); // IndexedDBからも削除（非同期）
   closeEditModal();
   save();
 }
@@ -1213,9 +1280,13 @@ if ('serviceWorker' in navigator) {
 //  起動
 // ══════════════════════════════════════════
 
-loadSettings();
-loadData();
-render();
+async function init() {
+  loadSettings();
+  loadData();              // localStorageから商品データ読込＋旧写真をキャッシュへ移行
+  await loadAllPhotosToCache(); // IndexedDBから全写真をキャッシュへ
+  render();
+}
+init();
 </script>
 </body>
 </html>
