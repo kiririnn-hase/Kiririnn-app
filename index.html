@@ -192,8 +192,12 @@
       border-radius: 12px; padding: 12px;
       font-size: 16px; outline: none; font-family: inherit;
     }
-    input[type=file] { font-size: 13px; padding: 10px; }
-    input[type=date] { font-size: 15px; }
+    input[type=file] { font-size: 16px; padding: 10px; }
+    input[type=date] {
+      font-size: 16px;   /* 16px未満でiOSが自動ズーム */
+      width: auto;       /* 全幅にしない */
+      min-width: 160px;
+    }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
     /* ── Sheet action buttons ── */
