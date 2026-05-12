@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
   <link rel="manifest" href="manifest.json" />
   <title>キリリンSHOP管理</title>
@@ -156,18 +156,15 @@
       background: rgba(0,0,0,.65);
       display: none; align-items: flex-end;
       z-index: 20;
-      overflow-x: hidden; /* 横スクロール防止 */
     }
     .modal.open { display: flex; }
     .sheet {
       width: 100%;
-      max-width: 100vw; /* 画面幅を超えない */
-      box-sizing: border-box;
       background: #0b1220;
       border-radius: 24px 24px 0 0;
       border: 1px solid var(--border); border-bottom: none;
       padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
-      max-height: 92vh; overflow-y: auto; overflow-x: hidden;
+      max-height: 92vh; overflow-y: auto;
     }
     .sheet-header {
       display: flex; justify-content: space-between; align-items: center;
@@ -195,8 +192,8 @@
       border-radius: 12px; padding: 12px;
       font-size: 16px; outline: none; font-family: inherit;
     }
-    input[type=file] { font-size: 16px; padding: 10px; }
-    input[type=date] { font-size: 16px; } /* 16px未満だとiOSが自動ズームする */
+    input[type=file] { font-size: 13px; padding: 10px; }
+    input[type=date] { font-size: 15px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
     /* ── Sheet action buttons ── */
@@ -625,8 +622,8 @@
         <div class="settings-label">JSONインポート</div>
         <div class="settings-sub">バックアップから復元（結合）</div>
       </div>
-      <button class="settings-btn" onclick="document.getElementById('importFile').click()">読み込み</button>
-      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)" />
+      <label for="importFile" class="settings-btn" style="cursor:pointer">読み込み</label>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importJSON(this)" />
     </div>
     <div class="settings-row">
       <div>
@@ -1228,20 +1225,29 @@ function importJSON(input) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data)) throw new Error('不正なフォーマット');
-      if (!confirm(`${data.length}件のデータを読み込みます。\n現在のデータと結合します（重複はスキップ）。よろしいですか？`)) return;
+      const text = e.target.result;
+      // BOM除去（Excelなどが付加する場合がある）
+      const cleaned = text.replace(/^﻿/, '');
+      const data = JSON.parse(cleaned);
+      // 配列でない場合、{items:[...]}形式にも対応
+      const list = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : null);
+      if (!list) throw new Error('データ形式が正しくありません');
+      if (!confirm(`${list.length}件のデータを読み込みます。\n現在のデータと結合します（重複はスキップ）。よろしいですか？`)) return;
       const existingIds = new Set(items.map(x => x.id));
-      const newItems = data.filter(x => !existingIds.has(x.id));
+      const newItems = list.filter(x => x && x.id && !existingIds.has(x.id));
       items = [...items, ...newItems];
       save();
-      alert(`${newItems.length}件を追加しました（重複スキップ：${data.length - newItems.length}件）`);
+      alert(`✅ ${newItems.length}件を追加しました（重複スキップ：${list.length - newItems.length}件）`);
     } catch (err) {
-      alert('読み込み失敗: ' + err.message);
+      alert('読み込み失敗: ' + err.message + '\n\nファイルが正しいJSONバックアップか確認してください');
     }
     input.value = '';
   };
-  reader.readAsText(file);
+  reader.onerror = () => {
+    alert('ファイルの読み込みに失敗しました。もう一度お試しください。');
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
 }
 
 function exportCSV() {
