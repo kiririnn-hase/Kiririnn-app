@@ -1208,8 +1208,13 @@ function openSettings() {
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
 
-function exportJSON() {
-  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+async function exportJSON() {
+  // 写真をphotoCacheから埋め込んでエクスポート
+  const exportData = items.map(x => ({
+    ...x,
+    _photos: photosCache[x.id] || []
+  }));
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), {
     href:     url,
@@ -1235,9 +1240,19 @@ function importJSON(input) {
       if (!confirm(`${list.length}件のデータを読み込みます。\n現在のデータと結合します（重複はスキップ）。よろしいですか？`)) return;
       const existingIds = new Set(items.map(x => x.id));
       const newItems = list.filter(x => x && x.id && !existingIds.has(x.id));
+      // 写真を_photosからIndexedDB＋キャッシュへ復元
+      let photoCount = 0;
+      for (const x of newItems) {
+        if (x._photos && x._photos.length) {
+          photosCache[x.id] = x._photos;
+          savePhotos(x.id, x._photos);
+          photoCount++;
+        }
+        delete x._photos; // itemsには写真を持たせない
+      }
       items = [...items, ...newItems];
       save();
-      alert(`✅ ${newItems.length}件を追加しました（重複スキップ：${list.length - newItems.length}件）`);
+      alert(`✅ ${newItems.length}件を追加しました\n写真復元: ${photoCount}件\n（重複スキップ：${list.length - newItems.length}件）`);
     } catch (err) {
       alert('読み込み失敗: ' + err.message + '\n\nファイルが正しいJSONバックアップか確認してください');
     }
