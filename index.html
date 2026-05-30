@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
   <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <title>キリリンSHOP管理</title>
   <style>
     :root {
@@ -62,6 +63,24 @@
       box-shadow: 0 8px 20px rgba(0,0,0,.2);
     }
     .card.wide { grid-column: 1 / -1; }
+    /* 利益率 + 出品数 + 販売数の3分割カード */
+    .card-trio {
+      display: flex;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .card-trio-item {
+      flex: 1;
+      padding: 14px;
+      min-width: 0;
+    }
+    .card-trio-divider {
+      width: 1px;
+      background: var(--border);
+      margin: 10px 0;
+      flex: 0 0 1px;
+    }
     .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
     .value { font-size: 24px; font-weight: 850; letter-spacing: -.4px; }
     .sub   { font-size: 11px; color: var(--muted); margin-top: 4px; }
@@ -156,15 +175,18 @@
       background: rgba(0,0,0,.65);
       display: none; align-items: flex-end;
       z-index: 20;
+      overflow-x: hidden; /* 横スクロール防止 */
     }
     .modal.open { display: flex; }
     .sheet {
       width: 100%;
+      max-width: 100vw; /* 画面幅を超えない */
+      box-sizing: border-box;
       background: #0b1220;
       border-radius: 24px 24px 0 0;
       border: 1px solid var(--border); border-bottom: none;
       padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
-      max-height: 92vh; overflow-y: auto;
+      max-height: 92vh; overflow-y: auto; overflow-x: hidden;
     }
     .sheet-header {
       display: flex; justify-content: space-between; align-items: center;
@@ -193,11 +215,7 @@
       font-size: 16px; outline: none; font-family: inherit;
     }
     input[type=file] { font-size: 16px; padding: 10px; }
-    input[type=date] {
-      font-size: 16px;   /* 16px未満でiOSが自動ズーム */
-      width: auto;       /* 全幅にしない */
-      min-width: 160px;
-    }
+    input[type=date] { font-size: 16px; } /* 16px未満だとiOSが自動ズームする */
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
     /* ── Sheet action buttons ── */
@@ -263,7 +281,7 @@
     .m-input {
       flex: 1; min-width: 0;
       padding: 6px 8px !important;
-      font-size: 16px !important; /* 16px未満だとiOSが自動ズーム */
+      font-size: 14px !important;
       border-radius: 8px !important;
       text-align: right;
     }
@@ -288,6 +306,14 @@
     .check-label-text { font-size: 14px; font-weight: 600; line-height: 1.4; }
     .check-label-sub  { font-size: 11px; color: var(--muted); display: block; margin-top: 2px; }
 
+    /* ── 管理番号 ── */
+    .mgmt-no {
+      font-size: 11px; color: var(--accent); font-weight: 700;
+      background: rgba(56,189,248,.12);
+      padding: 1px 6px; border-radius: 6px; margin-right: 4px;
+      display: inline-block;
+    }
+
     /* ── Settings ── */
     .settings-row {
       display: flex; justify-content: space-between; align-items: center;
@@ -301,6 +327,59 @@
       color: var(--accent);
       padding: 8px 14px; border-radius: 10px;
       font-size: 13px; font-weight: 700; white-space: nowrap;
+    }
+
+    /* ── 検索バー ── */
+    .search-bar { margin: 0 0 10px; }
+    .search-bar input[type=search] {
+      width: 100%; padding: 11px 14px;
+      background: var(--card2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 12px;
+      font-size: 15px; outline: none; font-family: inherit;
+      -webkit-appearance: none;
+    }
+    .search-bar input[type=search]::placeholder { color: var(--muted); }
+    .filter-row { display: flex; gap: 8px; margin-top: 8px; }
+    .filter-row select {
+      flex: 1; background: var(--card2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 8px 10px; font-size: 13px; outline: none;
+    }
+
+    /* ── 月別ナビ ── */
+    .month-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 4px 0 2px;
+    }
+    .month-nav-label { font-size: 20px; font-weight: 800; }
+    .month-nav .icon-btn { font-size: 20px; }
+
+    /* ── 仕入先分析テーブル ── */
+    .analysis-table {
+      width: 100%; border-collapse: collapse; font-size: 12px;
+    }
+    .analysis-table th {
+      background: rgba(56,189,248,.08); color: var(--muted);
+      font-weight: 700; padding: 8px 10px; text-align: left;
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .analysis-table td {
+      padding: 8px 10px; border-bottom: 1px solid var(--border);
+    }
+    .analysis-table tr:last-child td { border-bottom: none; }
+    .analysis-table tr:hover td { background: rgba(56,189,248,.04); }
+
+    /* ── 手数料自動計算ヒント ── */
+    .fee-hint {
+      font-size: 11px; color: var(--accent); margin-top: 4px;
+      display: flex; align-items: center; gap: 4px;
+    }
+
+    /* ── バックアップバッジ ── */
+    .backup-badge {
+      display: inline-block;
+      background: rgba(34,197,94,.12); color: var(--green);
+      border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700;
     }
   </style>
 </head>
@@ -347,10 +426,24 @@
     <div class="value" id="turnover">0%</div>
     <div class="sub" id="turnoverSub">販売数 ÷ 総商品数</div>
   </div>
-  <div class="card wide">
-    <div class="label">利益率</div>
-    <div class="value green" id="margin">0%</div>
-    <div class="sub">今月 利益 ÷ 販売額</div>
+  <div class="card wide card-trio">
+    <div class="card-trio-item">
+      <div class="label">利益率</div>
+      <div class="value green" id="margin">0%</div>
+      <div class="sub">今月 利益 ÷ 販売額</div>
+    </div>
+    <div class="card-trio-divider"></div>
+    <div class="card-trio-item">
+      <div class="label">今月の出品数</div>
+      <div class="value" id="monthlyListed">0</div>
+      <div class="sub">今月出品した商品数</div>
+    </div>
+    <div class="card-trio-divider"></div>
+    <div class="card-trio-item">
+      <div class="label">今月の販売数</div>
+      <div class="value" id="monthlySoldCount">0</div>
+      <div class="sub">今月販売した商品数</div>
+    </div>
   </div>
 </section>
 
@@ -359,13 +452,119 @@
   <button class="tab active" id="tabUnlisted" onclick="setTab('unlisted')">未出品</button>
   <button class="tab"        id="tabListed"   onclick="setTab('listed')">出品済み</button>
   <button class="tab"        id="tabSold"     onclick="setTab('sold')">販売済み</button>
+  <button class="tab"        id="tabMonthly"  onclick="openMonthlyView()">📅 月別</button>
 </div>
 
-<div class="list-title">
-  <h2 id="listHeading">未出品商品</h2>
-  <span class="sub" id="itemCountLabel">0件</span>
+<!-- ━━━ 検索バー（在庫タブのみ表示）━━━ -->
+<div class="search-bar" id="searchBar">
+  <input type="search" id="searchInput"
+    placeholder="🔍 商品名・管理番号・ブランドで検索"
+    oninput="applyFilters()" autocomplete="off" />
+  <div class="filter-row">
+    <select id="filterStore" onchange="applyFilters()">
+      <option value="">📦 全店舗</option>
+    </select>
+    <select id="filterCategory" onchange="applyFilters()">
+      <option value="">🏷 全カテゴリ</option>
+    </select>
+  </div>
 </div>
-<section id="items"></section>
+
+<!-- ━━━ 在庫リスト ━━━ -->
+<div id="listSection">
+  <div class="list-title">
+    <h2 id="listHeading">未出品商品</h2>
+    <span class="sub" id="itemCountLabel">0件</span>
+  </div>
+  <section id="items"></section>
+</div>
+
+<!-- ━━━ 月別集計ビュー ━━━ -->
+<div id="monthlyView" style="display:none">
+
+  <!-- 月ナビ -->
+  <div class="month-nav">
+    <button class="icon-btn" onclick="changeMonth(-1)">◀</button>
+    <span class="month-nav-label" id="selectedMonthLabel"></span>
+    <button class="icon-btn" onclick="changeMonth(1)">▶</button>
+  </div>
+
+  <!-- 月別 KPI グリッド -->
+  <div class="grid" style="margin-top:12px">
+    <div class="card">
+      <div class="label">販売額合計</div>
+      <div class="value" id="mSales">¥0</div>
+      <div class="sub">この月に売れた合計額</div>
+    </div>
+    <div class="card">
+      <div class="label">利益合計</div>
+      <div class="value green" id="mProfit">¥0</div>
+      <div class="sub">売価－仕入－手数料－送料</div>
+    </div>
+    <div class="card">
+      <div class="label">仕入額（当月登録）</div>
+      <div class="value" id="mCost">¥0</div>
+      <div class="sub">この月に仕入れた合計</div>
+    </div>
+    <div class="card">
+      <div class="label">利益率</div>
+      <div class="value green" id="mMargin">0%</div>
+      <div class="sub">利益 ÷ 販売額</div>
+    </div>
+    <div class="card wide card-trio">
+      <div class="card-trio-item">
+        <div class="label">販売数</div>
+        <div class="value" id="mCount">0件</div>
+      </div>
+      <div class="card-trio-divider"></div>
+      <div class="card-trio-item">
+        <div class="label">手数料合計</div>
+        <div class="value" id="mFee">¥0</div>
+      </div>
+      <div class="card-trio-divider"></div>
+      <div class="card-trio-item">
+        <div class="label">送料合計</div>
+        <div class="value" id="mShipping">¥0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 仕入先別成績 -->
+  <div style="margin-top:20px">
+    <div class="list-title" style="margin-bottom:8px">
+      <h2>🏪 仕入先別成績</h2>
+      <span class="sub" id="storeCountLabel"></span>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="analysis-table">
+        <thead>
+          <tr>
+            <th>仕入先</th>
+            <th style="text-align:right">件数</th>
+            <th style="text-align:right">仕入額</th>
+            <th style="text-align:right">販売額</th>
+            <th style="text-align:right">利益</th>
+            <th style="text-align:right">利益率</th>
+          </tr>
+        </thead>
+        <tbody id="storeAnalysisBody">
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">データなし</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- この月の販売済み商品一覧 -->
+  <div style="margin-top:20px">
+    <div class="list-title" style="margin-bottom:8px">
+      <h2 id="monthlyItemHeading">販売済み商品</h2>
+    </div>
+    <div id="monthlyItemList">
+      <div class="empty">この月の販売データがありません</div>
+    </div>
+  </div>
+
+</div>
 
 <!-- ━━━ FAB ━━━ -->
 <button class="fab" onclick="openAddModal()">＋</button>
@@ -387,8 +586,54 @@
       <input type="file" id="addPhotos" accept="image/*" multiple />
     </div>
     <div class="field">
-      <label>商品名 / メモ</label>
+      <label>商品名</label>
       <input id="addName" placeholder="例：ラルフローレン ポロシャツ" />
+    </div>
+    <div class="field">
+      <label>管理番号 <span style="font-size:11px;color:var(--muted)">（ホワイトボードの番号と一致させてください）</span></label>
+      <input id="addManagementNo" placeholder="例：1398　または　0-6-1387" />
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>ブランド</label>
+        <input id="addBrand" placeholder="例：Ralph Lauren" />
+      </div>
+      <div class="field">
+        <label>カテゴリ</label>
+        <input id="addCategory" placeholder="例：メンズ > トップス" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>目安サイズ</label>
+        <input id="addEstimatedSize" placeholder="例：M" />
+      </div>
+      <div class="field">
+        <label>表記サイズ（タグ）</label>
+        <input id="addLabeledSize" placeholder="例：L / 42 / Free" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>カラー</label>
+        <input id="addColor" placeholder="例：ネイビー" />
+      </div>
+      <div class="field">
+        <label>素材</label>
+        <input id="addMaterial" placeholder="例：コットン100%" />
+      </div>
+    </div>
+    <div class="field">
+      <label>状態</label>
+      <select id="addCondition">
+        <option value="">未選択</option>
+        <option value="新品、未使用">新品、未使用</option>
+        <option value="未使用に近い">未使用に近い</option>
+        <option value="目立った傷や汚れなし">目立った傷や汚れなし</option>
+        <option value="やや傷や汚れあり">やや傷や汚れあり</option>
+        <option value="傷や汚れあり">傷や汚れあり</option>
+        <option value="全体的に状態が悪い">全体的に状態が悪い</option>
+      </select>
     </div>
     <div class="row">
       <div class="field">
@@ -427,6 +672,10 @@
       </div>
     </div>
     <div class="field">
+      <label>メモ <span style="font-size:11px;color:var(--muted)">（内部用・CSV出力に含まれます）</span></label>
+      <textarea id="addMemo" rows="2" placeholder="例：袖口に薄いシミあり" style="font-size:14px;padding:10px;resize:vertical"></textarea>
+    </div>
+    <div class="field">
       <label>ステータス</label>
       <select id="addStatus">
         <option value="unlisted">未出品</option>
@@ -462,11 +711,12 @@
     <div class="row">
       <div class="field">
         <label>販売額</label>
-        <input id="sellPrice" type="number" placeholder="5000" oninput="updateSellPreview()" />
+        <input id="sellPrice" type="number" placeholder="5000" oninput="onSellPriceInput()" />
       </div>
       <div class="field">
         <label>メルカリ手数料</label>
-        <input id="sellFee" type="number" placeholder="500" oninput="updateSellPreview()" />
+        <input id="sellFee" type="number" placeholder="500" oninput="onSellFeeInput()" />
+        <div class="fee-hint" id="feeHint">⚡ 販売額の10%を自動計算</div>
       </div>
     </div>
     <div class="row">
@@ -506,8 +756,54 @@
       <input type="file" id="editPhotos" accept="image/*" multiple />
     </div>
     <div class="field">
-      <label>商品名 / メモ</label>
+      <label>商品名</label>
       <input id="editName" placeholder="例：ラルフローレン ポロシャツ" />
+    </div>
+    <div class="field">
+      <label>管理番号 <span style="font-size:11px;color:var(--muted)">（ホワイトボードの番号と一致させてください）</span></label>
+      <input id="editManagementNo" placeholder="例：1398　または　0-6-1387" />
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>ブランド</label>
+        <input id="editBrand" placeholder="例：Ralph Lauren" />
+      </div>
+      <div class="field">
+        <label>カテゴリ</label>
+        <input id="editCategory" placeholder="例：メンズ > トップス" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>目安サイズ</label>
+        <input id="editEstimatedSize" placeholder="例：M" />
+      </div>
+      <div class="field">
+        <label>表記サイズ（タグ）</label>
+        <input id="editLabeledSize" placeholder="例：L / 42 / Free" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>カラー</label>
+        <input id="editColor" placeholder="例：ネイビー" />
+      </div>
+      <div class="field">
+        <label>素材</label>
+        <input id="editMaterial" placeholder="例：コットン100%" />
+      </div>
+    </div>
+    <div class="field">
+      <label>状態</label>
+      <select id="editCondition">
+        <option value="">未選択</option>
+        <option value="新品、未使用">新品、未使用</option>
+        <option value="未使用に近い">未使用に近い</option>
+        <option value="目立った傷や汚れなし">目立った傷や汚れなし</option>
+        <option value="やや傷や汚れあり">やや傷や汚れあり</option>
+        <option value="傷や汚れあり">傷や汚れあり</option>
+        <option value="全体的に状態が悪い">全体的に状態が悪い</option>
+      </select>
     </div>
     <div class="row">
       <div class="field">
@@ -546,6 +842,10 @@
       </div>
     </div>
     <div class="field">
+      <label>メモ <span style="font-size:11px;color:var(--muted)">（内部用・CSV出力に含まれます）</span></label>
+      <textarea id="editMemo" rows="2" placeholder="例：袖口に薄いシミあり" style="font-size:14px;padding:10px;resize:vertical"></textarea>
+    </div>
+    <div class="field">
       <label class="check-label">
         <input type="checkbox" id="editFromShelf" />
         <span>
@@ -567,11 +867,12 @@
       <div class="row">
         <div class="field">
           <label>販売額</label>
-          <input id="editSalePrice" type="number" placeholder="5000" />
+          <input id="editSalePrice" type="number" placeholder="5000" oninput="onEditSalePriceInput()" />
         </div>
         <div class="field">
           <label>手数料</label>
-          <input id="editFee" type="number" placeholder="500" />
+          <input id="editFee" type="number" placeholder="500" oninput="onEditFeeInput()" />
+          <div class="fee-hint" id="editFeeHint">⚡ 販売額の10%を自動計算</div>
         </div>
       </div>
       <div class="row">
@@ -626,8 +927,8 @@
         <div class="settings-label">JSONインポート</div>
         <div class="settings-sub">バックアップから復元（結合）</div>
       </div>
-      <label for="importFile" class="settings-btn" style="cursor:pointer">読み込み</label>
-      <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importJSON(this)" />
+      <button class="settings-btn" onclick="document.getElementById('importFile').click()">読み込み</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)" />
     </div>
     <div class="settings-row">
       <div>
@@ -635,6 +936,20 @@
         <div class="settings-sub">帳簿・マネーフォワード用</div>
       </div>
       <button class="settings-btn" onclick="exportCSV()">書き出し</button>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">📦 メルカリ出品用CSV出力</div>
+        <div class="settings-sub">mercari_inventory_export.csv（出品ツール連携用）<br>ダウンロード後 → メルカリ出品ツール/data/ へ移動</div>
+      </div>
+      <button class="settings-btn" style="background:rgba(56,189,248,.15);color:var(--accent)" onclick="exportMercariCSV()">書き出し</button>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">自動バックアップ</div>
+        <div class="settings-sub" id="backupSummary">保存時に自動で日付ごとに保管（最大30件）</div>
+      </div>
+      <button class="settings-btn" onclick="showBackupList()">一覧</button>
     </div>
     <div class="settings-row">
       <div>
@@ -656,6 +971,19 @@ let settings = { initialShelf: 0 };
 let currentTab = 'unlisted';
 let editingPhotos = [];   // 編集モーダル内の写真配列（参照渡し用）
 let photosCache = {};     // { itemId: [base64, ...] } — IndexedDBの写真キャッシュ
+
+// ── 月別ビュー ──
+let selectedYear  = new Date().getFullYear();
+let selectedMonth = new Date().getMonth() + 1;
+
+// ── 検索・フィルター ──
+let searchQuery    = '';
+let filterStore    = '';
+let filterCategory = '';
+
+// ── 手数料自動計算 ──
+let autoFeeActive     = true;   // 販売登録モーダル
+let autoEditFeeActive = true;   // 編集モーダル
 
 // ══════════════════════════════════════════
 //  IndexedDB（写真専用・容量制限ほぼなし）
@@ -736,6 +1064,7 @@ function loadSettings() {
 function save() {
   try {
     localStorage.setItem('kiririn_items', JSON.stringify(items));
+    autoBackup();
   } catch (e) {
     alert('⚠️ 保存に失敗しました: ' + e.message);
   }
@@ -806,27 +1135,35 @@ function renderStats() {
   const totalItems = initialShelf + newItems.length;
   const turnover   = totalItems ? (sold.length / totalItems * 100) : 0;
 
-  const monthlyProfit = monthSold.reduce((a,x) => a + calcProfit(x), 0);
-  const monthlySales  = monthSold.reduce((a,x) => a + Number(x.salePrice||0), 0);
-  const monthlyCost   = items
+  const monthlyProfit     = monthSold.reduce((a,x) => a + calcProfit(x), 0);
+  const monthlySales      = monthSold.reduce((a,x) => a + Number(x.salePrice||0), 0);
+  const monthlyCost       = items
     .filter(x => thisMonth(x.createdAt) && !x.fromShelf)
     .reduce((a,x) => a + Number(x.cost||0), 0);
-  const yearProfit    = yearSold.reduce((a,x) => a + calcProfit(x), 0);
-  const margin        = monthlySales ? (monthlyProfit / monthlySales * 100) : 0;
+  const yearProfit        = yearSold.reduce((a,x) => a + calcProfit(x), 0);
+  const margin            = monthlySales ? (monthlyProfit / monthlySales * 100) : 0;
+  // 今月の出品数（listedAt が今月のもの）
+  const monthlyListedCount = items.filter(x => thisMonth(x.listedAt)).length;
+  // 今月の販売数（soldAt が今月のもの）
+  const monthlySoldCount   = items.filter(x => thisMonth(x.soldAt)).length;
 
-  document.getElementById('monthlyProfit').textContent = yen(monthlyProfit);
-  document.getElementById('monthlySales').textContent  = yen(monthlySales);
-  document.getElementById('monthlyCost').textContent   = yen(monthlyCost);
-  document.getElementById('yearProfit').textContent    = yen(yearProfit);
-  document.getElementById('stockCount').textContent    = displayStock;
-  document.getElementById('stockSub').textContent      =
+  document.getElementById('monthlyProfit').textContent    = yen(monthlyProfit);
+  document.getElementById('monthlyProfit').className      = 'value ' + (monthlyProfit >= 0 ? 'green' : 'red');
+  document.getElementById('monthlySales').textContent     = yen(monthlySales);
+  document.getElementById('monthlyCost').textContent      = yen(monthlyCost);
+  document.getElementById('yearProfit').textContent       = yen(yearProfit);
+  document.getElementById('stockCount').textContent       = displayStock;
+  document.getElementById('stockSub').textContent         =
     initialShelf
       ? `棚在庫残 ${remainingShelf} | 未出品 ${unlisted} / 出品済み ${listed}`
       : `未出品 ${unlisted} / 出品済み ${listed}`;
-  document.getElementById('turnover').textContent      = turnover.toFixed(1) + '%';
-  document.getElementById('turnoverSub').textContent   =
+  document.getElementById('turnover').textContent         = turnover.toFixed(1) + '%';
+  document.getElementById('turnoverSub').textContent      =
     `販売数 ${sold.length} ÷ 総商品数 ${totalItems}`;
-  document.getElementById('margin').textContent        = margin.toFixed(1) + '%';
+  document.getElementById('margin').textContent           = margin.toFixed(1) + '%';
+  document.getElementById('margin').className             = 'value ' + (margin >= 0 ? 'green' : 'red');
+  document.getElementById('monthlyListed').textContent    = monthlyListedCount + '件';
+  document.getElementById('monthlySoldCount').textContent = monthlySoldCount + '件';
   document.getElementById('dataSummary').textContent   =
     `全 ${items.length} 件 / 棚在庫設定 ${initialShelf} 件（残 ${remainingShelf} 件）`;
 
@@ -855,8 +1192,13 @@ function renderList() {
   });
   document.getElementById('listHeading').textContent = TAB_HEADING[currentTab];
 
-  const list = items.filter(x => x.status === currentTab);
-  document.getElementById('itemCountLabel').textContent = `${list.length}件`;
+  // ストア・カテゴリフィルターの選択肢を更新
+  updateFilterOptions();
+
+  const list = getFilteredItems(currentTab);
+  const total = items.filter(x => x.status === currentTab).length;
+  document.getElementById('itemCountLabel').textContent =
+    list.length < total ? `${list.length}件（全${total}件中）` : `${list.length}件`;
 
   const box = document.getElementById('items');
   if (!list.length) {
@@ -871,11 +1213,14 @@ function renderList() {
     const multi  = photos.length > 1
       ? `<span style="font-size:11px;color:var(--muted)">📷${photos.length}</span>` : '';
 
-    const badge = `<span class="badge ${x.status}">${STATUS_LABEL[x.status]}</span>`;
+    const badge  = `<span class="badge ${x.status}">${STATUS_LABEL[x.status]}</span>`;
+    const mgmtBadge = x.managementNo
+      ? `<span class="mgmt-no">#${x.managementNo}</span>` : '';
     const targetStr = x.targetPrice ? ` / 希望 ${yen(x.targetPrice)}` : '';
+    const brandStr  = x.brand ? ` / ${x.brand}` : '';
     const meta  = x.status === 'sold'
-      ? `${x.store||'店舗未入力'} / 売価 ${yen(x.salePrice)} / 仕入 ${yen(x.cost)}`
-      : `${x.store||'店舗未入力'} / 仕入 ${yen(x.cost)}${targetStr}`;
+      ? `${x.store||'店舗未入力'} / 売価 ${yen(x.salePrice)} / 仕入 ${yen(x.cost)}${brandStr}`
+      : `${x.store||'店舗未入力'} / 仕入 ${yen(x.cost)}${targetStr}${brandStr}`;
 
     let actions = '';
     if (x.status === 'unlisted') {
@@ -902,7 +1247,7 @@ function renderList() {
         <div class="thumb">${img}</div>
         <div class="item-main">
           <div>${badge} ${multi}</div>
-          <div class="item-name">${x.name || '無題の商品'}</div>
+          <div class="item-name">${mgmtBadge}${x.name || '無題の商品'}</div>
           <div class="item-meta">${meta}</div>
           <div class="item-actions">${actions}</div>
         </div>
@@ -910,8 +1255,24 @@ function renderList() {
   }).join('');
 }
 
-function render() { renderStats(); renderList(); }
-function setTab(tab) { currentTab = tab; renderList(); }
+function render() {
+  renderStats();
+  renderList();
+  // 月別ビューが開いていれば更新
+  if (document.getElementById('monthlyView').style.display !== 'none') {
+    renderMonthly();
+  }
+}
+
+function setTab(tab) {
+  currentTab = tab;
+  // 月別ビューを閉じて在庫リストを表示
+  document.getElementById('monthlyView').style.display  = 'none';
+  document.getElementById('listSection').style.display  = '';
+  document.getElementById('searchBar').style.display    = '';
+  document.getElementById('tabMonthly').classList.remove('active');
+  renderList();
+}
 
 // ══════════════════════════════════════════
 //  採寸ユーティリティ
@@ -980,14 +1341,23 @@ function readPhotos(fileList) {
 // ══════════════════════════════════════════
 
 function openAddModal() {
-  document.getElementById('addPurchaseDate').value = todayISO();
-  document.getElementById('addName').value         = '';
-  document.getElementById('addStore').value        = '';
-  document.getElementById('addCost').value         = '';
-  document.getElementById('addTargetPrice').value  = '';
-  document.getElementById('addPhotos').value       = '';
-  document.getElementById('addStatus').value       = 'unlisted';
-  document.getElementById('addFromShelf').checked  = false;
+  document.getElementById('addPurchaseDate').value  = todayISO();
+  document.getElementById('addName').value          = '';
+  document.getElementById('addManagementNo').value  = '';
+  document.getElementById('addBrand').value         = '';
+  document.getElementById('addCategory').value      = '';
+  document.getElementById('addEstimatedSize').value = '';
+  document.getElementById('addLabeledSize').value   = '';
+  document.getElementById('addColor').value         = '';
+  document.getElementById('addMaterial').value      = '';
+  document.getElementById('addCondition').value     = '';
+  document.getElementById('addMemo').value          = '';
+  document.getElementById('addStore').value         = '';
+  document.getElementById('addCost').value          = '';
+  document.getElementById('addTargetPrice').value   = '';
+  document.getElementById('addPhotos').value        = '';
+  document.getElementById('addStatus').value        = 'unlisted';
+  document.getElementById('addFromShelf').checked   = false;
   clearMeasurements('add');
   document.getElementById('addModal').classList.add('open');
 }
@@ -1012,12 +1382,21 @@ async function addItem() {
   items.unshift({
     id,
     status,
-    name:        document.getElementById('addName').value.trim(),
-    store:       document.getElementById('addStore').value.trim(),
-    cost:        Number(document.getElementById('addCost').value        || 0),
-    targetPrice: Number(document.getElementById('addTargetPrice').value || 0) || null,
-    fromShelf:   document.getElementById('addFromShelf').checked,
-    measurements: getMeasurements('add'),
+    name:          document.getElementById('addName').value.trim(),
+    managementNo:  document.getElementById('addManagementNo').value.trim(),
+    brand:         document.getElementById('addBrand').value.trim(),
+    category:      document.getElementById('addCategory').value.trim(),
+    estimatedSize: document.getElementById('addEstimatedSize').value.trim(),
+    labeledSize:   document.getElementById('addLabeledSize').value.trim(),
+    color:         document.getElementById('addColor').value.trim(),
+    material:      document.getElementById('addMaterial').value.trim(),
+    condition:     document.getElementById('addCondition').value,
+    memo:          document.getElementById('addMemo').value.trim(),
+    store:         document.getElementById('addStore').value.trim(),
+    cost:          Number(document.getElementById('addCost').value        || 0),
+    targetPrice:   Number(document.getElementById('addTargetPrice').value || 0) || null,
+    fromShelf:     document.getElementById('addFromShelf').checked,
+    measurements:  getMeasurements('add'),
     createdAt,
     listedAt:  status === 'listed' ? new Date().toISOString() : null,
   });
@@ -1050,6 +1429,9 @@ function openSellModal(id) {
   document.getElementById('sellShipping').value = '';
   document.getElementById('sellDate').value     = todayISO();
   document.getElementById('sellPreview').textContent = '';
+  autoFeeActive = true;  // 自動計算モードをリセット
+  const hint = document.getElementById('feeHint');
+  if (hint) hint.textContent = '⚡ 販売額の10%を自動計算';
   document.getElementById('sellModal').classList.add('open');
 }
 function closeSellModal() { document.getElementById('sellModal').classList.remove('open'); }
@@ -1093,20 +1475,35 @@ function openEditModal(id) {
   if (!item) return;
   editingPhotos = [...(photosCache[id] || [])];
 
-  document.getElementById('editId').value           = id;
-  document.getElementById('editPurchaseDate').value = toDateInput(item.createdAt);
-  document.getElementById('editName').value         = item.name  || '';
-  document.getElementById('editStore').value        = item.store || '';
-  document.getElementById('editCost').value         = item.cost  || '';
-  document.getElementById('editTargetPrice').value  = item.targetPrice || '';
-  document.getElementById('editFromShelf').checked  = item.fromShelf || false;
-  document.getElementById('editStatus').value       = item.status;
-  document.getElementById('editPhotos').value       = '';
-  document.getElementById('editSalePrice').value    = item.salePrice || '';
-  document.getElementById('editFee').value          = item.fee       || '';
-  document.getElementById('editShipping').value     = item.shipping  || '';
-  document.getElementById('editSoldDate').value     = toDateInput(item.soldAt);
+  document.getElementById('editId').value            = id;
+  document.getElementById('editPurchaseDate').value  = toDateInput(item.createdAt);
+  document.getElementById('editName').value          = item.name          || '';
+  document.getElementById('editManagementNo').value  = item.managementNo  || '';
+  document.getElementById('editBrand').value         = item.brand         || '';
+  document.getElementById('editCategory').value      = item.category      || '';
+  document.getElementById('editEstimatedSize').value = item.estimatedSize  || '';
+  document.getElementById('editLabeledSize').value   = item.labeledSize   || '';
+  document.getElementById('editColor').value         = item.color         || '';
+  document.getElementById('editMaterial').value      = item.material      || '';
+  document.getElementById('editCondition').value     = item.condition     || '';
+  document.getElementById('editMemo').value          = item.memo          || '';
+  document.getElementById('editStore').value         = item.store         || '';
+  document.getElementById('editCost').value          = item.cost          || '';
+  document.getElementById('editTargetPrice').value   = item.targetPrice   || '';
+  document.getElementById('editFromShelf').checked   = item.fromShelf     || false;
+  document.getElementById('editStatus').value        = item.status;
+  document.getElementById('editPhotos').value        = '';
+  document.getElementById('editSalePrice').value     = item.salePrice     || '';
+  document.getElementById('editFee').value           = item.fee           || '';
+  document.getElementById('editShipping').value      = item.shipping      || '';
+  document.getElementById('editSoldDate').value      = toDateInput(item.soldAt);
   setMeasurements('edit', item.measurements || null);
+
+  // 手数料が既に入力済みの場合は手動モードにする
+  autoEditFeeActive = !(item.fee);
+  const editFeeHint = document.getElementById('editFeeHint');
+  if (editFeeHint) editFeeHint.textContent = autoEditFeeActive
+    ? '⚡ 販売額の10%を自動計算' : '✏️ 手動入力';
 
   renderEditPhotos();
   onEditStatusChange();
@@ -1157,11 +1554,20 @@ async function saveEdit() {
   if (editPurchaseDateVal) {
     item.createdAt = new Date(editPurchaseDateVal + 'T00:00:00').toISOString();
   }
-  item.name         = document.getElementById('editName').value.trim();
-  item.store        = document.getElementById('editStore').value.trim();
-  item.cost         = Number(document.getElementById('editCost').value        || 0);
-  item.targetPrice  = Number(document.getElementById('editTargetPrice').value || 0) || null;
-  item.fromShelf    = document.getElementById('editFromShelf').checked;
+  item.name          = document.getElementById('editName').value.trim();
+  item.managementNo  = document.getElementById('editManagementNo').value.trim();
+  item.brand         = document.getElementById('editBrand').value.trim();
+  item.category      = document.getElementById('editCategory').value.trim();
+  item.estimatedSize = document.getElementById('editEstimatedSize').value.trim();
+  item.labeledSize   = document.getElementById('editLabeledSize').value.trim();
+  item.color         = document.getElementById('editColor').value.trim();
+  item.material      = document.getElementById('editMaterial').value.trim();
+  item.condition     = document.getElementById('editCondition').value;
+  item.memo          = document.getElementById('editMemo').value.trim();
+  item.store         = document.getElementById('editStore').value.trim();
+  item.cost          = Number(document.getElementById('editCost').value        || 0);
+  item.targetPrice   = Number(document.getElementById('editTargetPrice').value || 0) || null;
+  item.fromShelf     = document.getElementById('editFromShelf').checked;
   // 写真はIndexedDB＋キャッシュへ更新
   photosCache[item.id] = [...editingPhotos];
   savePhotos(item.id, [...editingPhotos]); // 非同期・fire-and-forget
@@ -1207,18 +1613,22 @@ function deleteItem() {
 
 function openSettings() {
   document.getElementById('shelfCountInput').value = settings.initialShelf || '';
+  // バックアップ件数を表示
+  const backupKeys = Object.keys(localStorage)
+    .filter(k => k.startsWith('kiririn_auto_backup_')).sort().reverse();
+  const bsEl = document.getElementById('backupSummary');
+  if (bsEl) {
+    bsEl.textContent = backupKeys.length > 0
+      ? `${backupKeys.length}件保管中 / 最新: ${backupKeys[0].replace('kiririn_auto_backup_', '')}`
+      : '自動保存はまだありません（次回保存時に作成されます）';
+  }
   renderStats();
   document.getElementById('settingsModal').classList.add('open');
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
 
-async function exportJSON() {
-  // 写真をphotoCacheから埋め込んでエクスポート
-  const exportData = items.map(x => ({
-    ...x,
-    _photos: photosCache[x.id] || []
-  }));
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), {
     href:     url,
@@ -1234,39 +1644,91 @@ function importJSON(input) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const text = e.target.result;
-      // BOM除去（Excelなどが付加する場合がある）
-      const cleaned = text.replace(/^﻿/, '');
-      const data = JSON.parse(cleaned);
-      // 配列でない場合、{items:[...]}形式にも対応
-      const list = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : null);
-      if (!list) throw new Error('データ形式が正しくありません');
-      if (!confirm(`${list.length}件のデータを読み込みます。\n現在のデータと結合します（重複はスキップ）。よろしいですか？`)) return;
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('不正なフォーマット');
+      if (!confirm(`${data.length}件のデータを読み込みます。\n現在のデータと結合します（重複はスキップ）。よろしいですか？`)) return;
       const existingIds = new Set(items.map(x => x.id));
-      const newItems = list.filter(x => x && x.id && !existingIds.has(x.id));
-      // 写真を_photosからIndexedDB＋キャッシュへ復元
-      let photoCount = 0;
-      for (const x of newItems) {
-        if (x._photos && x._photos.length) {
-          photosCache[x.id] = x._photos;
-          savePhotos(x.id, x._photos);
-          photoCount++;
-        }
-        delete x._photos; // itemsには写真を持たせない
-      }
+      const newItems = data.filter(x => !existingIds.has(x.id));
       items = [...items, ...newItems];
       save();
-      alert(`✅ ${newItems.length}件を追加しました\n写真復元: ${photoCount}件\n（重複スキップ：${list.length - newItems.length}件）`);
+      alert(`${newItems.length}件を追加しました（重複スキップ：${data.length - newItems.length}件）`);
     } catch (err) {
-      alert('読み込み失敗: ' + err.message + '\n\nファイルが正しいJSONバックアップか確認してください');
+      alert('読み込み失敗: ' + err.message);
     }
     input.value = '';
   };
-  reader.onerror = () => {
-    alert('ファイルの読み込みに失敗しました。もう一度お試しください。');
-    input.value = '';
-  };
-  reader.readAsText(file, 'UTF-8');
+  reader.readAsText(file);
+}
+
+// ══════════════════════════════════════════
+//  メルカリ出品用 CSV エクスポート
+// ══════════════════════════════════════════
+
+function csvEscape(val) {
+  // nullやundefinedは空文字に、ダブルクォートをエスケープしてカンマ区切り対応
+  const str = (val == null) ? '' : String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function exportMercariCSV() {
+  const HEADERS = [
+    '管理番号', '商品名', 'ブランド', 'カテゴリ',
+    '目安サイズ', '表記サイズ',
+    '肩幅', '身幅', '袖丈', '着丈',
+    'ウエスト', '総丈', '股下', '渡り幅', '裾幅',
+    'カラー', '素材', '状態', '仕入額', 'メモ'
+  ];
+
+  const rows = items.map(x => {
+    const m = x.measurements || {};
+    return [
+      csvEscape(x.managementNo),
+      csvEscape(x.name),
+      csvEscape(x.brand),
+      csvEscape(x.category),
+      csvEscape(x.estimatedSize),
+      csvEscape(x.labeledSize),
+      csvEscape(m.katahaba  != null ? m.katahaba  : ''),
+      csvEscape(m.mihaba    != null ? m.mihaba    : ''),
+      csvEscape(m.sodake    != null ? m.sodake    : ''),
+      csvEscape(m.kitake    != null ? m.kitake    : ''),
+      csvEscape(m.waist     != null ? m.waist     : ''),
+      csvEscape(m.sozake    != null ? m.sozake    : ''),
+      csvEscape(m.matashita != null ? m.matashita : ''),
+      csvEscape(m.watarahaba!= null ? m.watarahaba: ''),
+      csvEscape(m.susohaba  != null ? m.susohaba  : ''),
+      csvEscape(x.color),
+      csvEscape(x.material),
+      csvEscape(x.condition),
+      csvEscape(x.cost || ''),
+      csvEscape(x.memo),
+    ].join(',');
+  });
+
+  // UTF-8 BOM 付き（Excelでの文字化け防止）
+  const csv  = '﻿' + [HEADERS.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href:     url,
+    download: 'mercari_inventory_export.csv',
+  });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  // 出力件数をお知らせ
+  const count = items.length;
+  alert(
+    `✅ CSV出力完了（${count}件）\n\n` +
+    `ファイル名: mercari_inventory_export.csv\n\n` +
+    `📁 ダウンロードフォルダに保存されました。\n` +
+    `メルカリ出品ツール / data / フォルダに移動してください。`
+  );
 }
 
 function exportCSV() {
@@ -1293,6 +1755,353 @@ function exportCSV() {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// ══════════════════════════════════════════
+//  検索・フィルター
+// ══════════════════════════════════════════
+
+function getFilteredItems(status) {
+  const q = searchQuery.toLowerCase().trim();
+  return items.filter(x => {
+    if (x.status !== status) return false;
+    if (q) {
+      const name  = (x.name         || '').toLowerCase();
+      const mgmt  = (x.managementNo || '').toLowerCase();
+      const brand = (x.brand        || '').toLowerCase();
+      const store = (x.store        || '').toLowerCase();
+      if (!name.includes(q) && !mgmt.includes(q) &&
+          !brand.includes(q) && !store.includes(q)) return false;
+    }
+    if (filterStore    && x.store    !== filterStore)    return false;
+    if (filterCategory && x.category !== filterCategory) return false;
+    return true;
+  });
+}
+
+function applyFilters() {
+  searchQuery    = document.getElementById('searchInput')?.value    || '';
+  filterStore    = document.getElementById('filterStore')?.value    || '';
+  filterCategory = document.getElementById('filterCategory')?.value || '';
+  renderList();
+}
+
+function updateFilterOptions() {
+  const storeSet    = new Set(items.map(x => x.store).filter(Boolean));
+  const categorySet = new Set(items.map(x => x.category).filter(Boolean));
+
+  const storeEl = document.getElementById('filterStore');
+  if (storeEl) {
+    const cur = storeEl.value;
+    storeEl.innerHTML = '<option value="">📦 全店舗</option>' +
+      [...storeSet].sort().map(s => `<option value="${s}"${s===cur?' selected':''}>${s}</option>`).join('');
+  }
+  const catEl = document.getElementById('filterCategory');
+  if (catEl) {
+    const cur = catEl.value;
+    catEl.innerHTML = '<option value="">🏷 全カテゴリ</option>' +
+      [...categorySet].sort().map(c => `<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+  }
+}
+
+// ══════════════════════════════════════════
+//  月別集計ビュー
+// ══════════════════════════════════════════
+
+function openMonthlyView() {
+  const now = new Date();
+  selectedYear  = now.getFullYear();
+  selectedMonth = now.getMonth() + 1;
+
+  // タブのアクティブ状態を切り替え
+  ['tabUnlisted','tabListed','tabSold'].forEach(id =>
+    document.getElementById(id).classList.remove('active'));
+  document.getElementById('tabMonthly').classList.add('active');
+
+  // 表示の切り替え
+  document.getElementById('listSection').style.display = 'none';
+  document.getElementById('searchBar').style.display   = 'none';
+  document.getElementById('monthlyView').style.display = '';
+
+  renderMonthly();
+}
+
+function changeMonth(delta) {
+  selectedMonth += delta;
+  if (selectedMonth > 12) { selectedMonth = 1;  selectedYear++; }
+  if (selectedMonth < 1)  { selectedMonth = 12; selectedYear--; }
+  renderMonthly();
+}
+
+function renderMonthly() {
+  // ヘッダー
+  document.getElementById('selectedMonthLabel').textContent =
+    `${selectedYear}年${selectedMonth}月`;
+
+  // この月に販売された商品
+  const soldThisMonth = items.filter(x => {
+    if (x.status !== 'sold' || !x.soldAt) return false;
+    const d = new Date(x.soldAt);
+    return d.getFullYear() === selectedYear && d.getMonth() + 1 === selectedMonth;
+  });
+
+  // この月に登録（仕入れ）した商品
+  const purchasedThisMonth = items.filter(x => {
+    if (!x.createdAt || x.fromShelf) return false;
+    const d = new Date(x.createdAt);
+    return d.getFullYear() === selectedYear && d.getMonth() + 1 === selectedMonth;
+  });
+
+  // KPI 計算
+  const sales    = soldThisMonth.reduce((a,x) => a + Number(x.salePrice||0), 0);
+  const profit   = soldThisMonth.reduce((a,x) => a + calcProfit(x), 0);
+  const cost     = purchasedThisMonth.reduce((a,x) => a + Number(x.cost||0), 0);
+  const fee      = soldThisMonth.reduce((a,x) => a + Number(x.fee||0), 0);
+  const shipping = soldThisMonth.reduce((a,x) => a + Number(x.shipping||0), 0);
+  const margin   = sales ? (profit / sales * 100) : 0;
+
+  document.getElementById('mSales').textContent   = yen(sales);
+  document.getElementById('mProfit').textContent  = yen(profit);
+  document.getElementById('mCost').textContent    = yen(cost);
+  document.getElementById('mMargin').textContent  = margin.toFixed(1) + '%';
+  document.getElementById('mCount').textContent   = soldThisMonth.length + '件';
+  document.getElementById('mFee').textContent     = yen(fee);
+  document.getElementById('mShipping').textContent = yen(shipping);
+
+  // 利益の色
+  document.getElementById('mProfit').className = 'value ' + (profit >= 0 ? 'green' : 'red');
+  document.getElementById('mMargin').className = 'value ' + (margin >= 0 ? 'green' : 'red');
+
+  // ── 仕入先別集計 ──
+  const storeMap = {};
+  soldThisMonth.forEach(x => {
+    const store = x.store || '（未入力）';
+    if (!storeMap[store]) storeMap[store] = { count:0, cost:0, sales:0, fee:0, shipping:0 };
+    storeMap[store].count++;
+    storeMap[store].cost     += Number(x.cost||0);
+    storeMap[store].sales    += Number(x.salePrice||0);
+    storeMap[store].fee      += Number(x.fee||0);
+    storeMap[store].shipping += Number(x.shipping||0);
+  });
+
+  const storeEntries = Object.entries(storeMap)
+    .map(([store, s]) => ({
+      store,
+      ...s,
+      profit: s.sales - s.cost - s.fee - s.shipping,
+    }))
+    .sort((a,b) => b.profit - a.profit);
+
+  const storeBody = document.getElementById('storeAnalysisBody');
+  const storeCount = document.getElementById('storeCountLabel');
+  if (storeCount) storeCount.textContent = `${storeEntries.length}店舗`;
+
+  storeBody.innerHTML = storeEntries.length
+    ? storeEntries.map(s => `
+        <tr>
+          <td>${s.store}</td>
+          <td style="text-align:right">${s.count}件</td>
+          <td style="text-align:right">${yen(s.cost)}</td>
+          <td style="text-align:right">${yen(s.sales)}</td>
+          <td style="text-align:right;color:var(--${s.profit>=0?'green':'red'})">${yen(s.profit)}</td>
+          <td style="text-align:right">${s.sales ? (s.profit/s.sales*100).toFixed(1)+'%' : '—'}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">この月の販売データがありません</td></tr>';
+
+  // ── 月別商品一覧 ──
+  document.getElementById('monthlyItemHeading').textContent =
+    `販売済み商品（${soldThisMonth.length}件）`;
+
+  const listEl = document.getElementById('monthlyItemList');
+  if (!soldThisMonth.length) {
+    listEl.innerHTML = '<div class="empty">この月の販売データがありません</div>';
+    return;
+  }
+
+  listEl.innerHTML = soldThisMonth.map(x => {
+    const photos  = photosCache[x.id] || [];
+    const src     = photos.length ? photos[0] : '';
+    const img     = src ? `<img src="${src}" />` : '<span style="font-size:9px;color:var(--muted)">No<br>Image</span>';
+    const p       = calcProfit(x);
+    const mgmtBadge = x.managementNo ? `<span class="mgmt-no">#${x.managementNo}</span>` : '';
+    const brandStr  = x.brand ? ` / ${x.brand}` : '';
+    const soldDate  = x.soldAt ? x.soldAt.slice(0,10) : '—';
+    return `
+      <div class="item">
+        <div class="thumb">${img}</div>
+        <div class="item-main">
+          <div class="item-name">${mgmtBadge}${x.name || '無題の商品'}${brandStr}</div>
+          <div class="item-meta">${x.store||'店舗未入力'} / 販売日: ${soldDate}</div>
+          <div class="item-meta">売価 ${yen(x.salePrice)} / 仕入 ${yen(x.cost)} / 手数料 ${yen(x.fee)} / 送料 ${yen(x.shipping)}</div>
+          <div class="item-actions">
+            <span class="item-profit ${p >= 0 ? 'green' : 'red'}">${yen(p)}</span>
+            <button class="btn-sm btn-ghost" onclick="openEditModal('${x.id}')">✏️</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+//  手数料自動計算
+// ══════════════════════════════════════════
+
+function onSellPriceInput() {
+  const price = Number(document.getElementById('sellPrice').value || 0);
+  if (autoFeeActive && price > 0) {
+    const autoFee = Math.floor(price * 0.1);
+    document.getElementById('sellFee').value = autoFee;
+    const hint = document.getElementById('feeHint');
+    if (hint) hint.textContent = `⚡ 自動計算: ${yen(autoFee)}（10%）`;
+  }
+  updateSellPreview();
+}
+
+function onSellFeeInput() {
+  autoFeeActive = false;  // 手動入力に切り替え
+  const hint = document.getElementById('feeHint');
+  if (hint) hint.textContent = '✏️ 手動入力';
+  updateSellPreview();
+}
+
+function onEditSalePriceInput() {
+  const price = Number(document.getElementById('editSalePrice').value || 0);
+  if (autoEditFeeActive && price > 0) {
+    const autoFee = Math.floor(price * 0.1);
+    document.getElementById('editFee').value = autoFee;
+    const hint = document.getElementById('editFeeHint');
+    if (hint) hint.textContent = `⚡ 自動計算: ${yen(autoFee)}（10%）`;
+  }
+}
+
+function onEditFeeInput() {
+  autoEditFeeActive = false;
+  const hint = document.getElementById('editFeeHint');
+  if (hint) hint.textContent = '✏️ 手動入力';
+}
+
+// ══════════════════════════════════════════
+//  自動バックアップ
+// ══════════════════════════════════════════
+
+function autoBackup() {
+  try {
+    const today      = todayISO();
+    const backupKey  = `kiririn_auto_backup_${today}`;
+    localStorage.setItem(backupKey, JSON.stringify(items));
+
+    // 30件より古いバックアップを削除
+    const backupKeys = Object.keys(localStorage)
+      .filter(k => k.startsWith('kiririn_auto_backup_'))
+      .sort()
+      .reverse(); // 新しい順
+
+    backupKeys.slice(30).forEach(k => localStorage.removeItem(k));
+  } catch(e) {
+    // バックアップ失敗は無視（localStorage容量不足などを想定）
+  }
+}
+
+function showBackupList() {
+  const keys = Object.keys(localStorage)
+    .filter(k => k.startsWith('kiririn_auto_backup_'))
+    .sort()
+    .reverse();
+
+  if (!keys.length) {
+    alert('自動バックアップはまだありません。\n次回のデータ保存時に作成されます。');
+    return;
+  }
+
+  const list = keys.map(k => {
+    const date = k.replace('kiririn_auto_backup_', '');
+    let count = '?';
+    try { count = JSON.parse(localStorage.getItem(k)).length + '件'; } catch(e) {}
+    return `${date}（${count}）`;
+  }).join('\n');
+
+  const msg = `📦 自動バックアップ一覧（${keys.length}件）\n\n${list}\n\n` +
+    `※ バックアップから復元するには、設定の「JSONインポート」でバックアップを読み込んでください。\n` +
+    `（ブラウザのlocalStorageに保存中）`;
+
+  if (confirm(msg + '\n\n最新バックアップをJSONでダウンロードしますか？')) {
+    const data = localStorage.getItem(keys[0]);
+    if (data) {
+      const blob = new Blob([data], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), {
+        href: url, download: `${keys[0]}.json`
+      });
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }
+}
+
+// ══════════════════════════════════════════
+//  PWA アイコン生成（Canvas → PNG → apple-touch-icon）
+// ══════════════════════════════════════════
+
+function generateAppIcon(size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const r = size * 0.18;
+
+  // 角丸背景
+  ctx.beginPath();
+  ctx.moveTo(r, 0); ctx.lineTo(size - r, 0);
+  ctx.quadraticCurveTo(size, 0, size, r);
+  ctx.lineTo(size, size - r);
+  ctx.quadraticCurveTo(size, size, size - r, size);
+  ctx.lineTo(r, size); ctx.quadraticCurveTo(0, size, 0, size - r);
+  ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath();
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+
+  // 内側カード色
+  ctx.beginPath();
+  const m = size * 0.04;
+  const ir = r * 0.8;
+  ctx.moveTo(m + ir, m); ctx.lineTo(size - m - ir, m);
+  ctx.quadraticCurveTo(size - m, m, size - m, m + ir);
+  ctx.lineTo(size - m, size - m - ir);
+  ctx.quadraticCurveTo(size - m, size - m, size - m - ir, size - m);
+  ctx.lineTo(m + ir, size - m); ctx.quadraticCurveTo(m, size - m, m, size - m - ir);
+  ctx.lineTo(m, m + ir); ctx.quadraticCurveTo(m, m, m + ir, m);
+  ctx.closePath();
+  ctx.fillStyle = '#1e293b';
+  ctx.fill();
+
+  // アクセントライン（上部）
+  ctx.fillStyle = '#a855f7';
+  ctx.fillRect(m, m, size - m * 2, size * 0.012);
+
+  // 「キ」文字
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = `900 ${size * 0.5}px 'Hiragino Sans', 'Yu Gothic UI', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('キ', size / 2, size * 0.44);
+
+  // 「SHOP」テキスト
+  ctx.fillStyle = '#a855f7';
+  ctx.font = `700 ${size * 0.12}px Arial, sans-serif`;
+  ctx.letterSpacing = `${size * 0.015}px`;
+  ctx.fillText('SHOP', size / 2, size * 0.82);
+
+  return canvas.toDataURL('image/png');
+}
+
+// apple-touch-icon を動的に設定（iOS ホーム画面用）
+(function() {
+  try {
+    const dataUrl = generateAppIcon(180);
+    let link = document.querySelector('link[rel="apple-touch-icon"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'apple-touch-icon'; document.head.appendChild(link); }
+    link.href = dataUrl;
+  } catch(e) { /* canvas非対応環境ではSVGフォールバック */ }
+})();
 
 // ══════════════════════════════════════════
 //  PWA Service Worker
