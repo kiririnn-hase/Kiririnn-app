@@ -1062,12 +1062,32 @@ function loadSettings() {
 }
 
 function save() {
+  const data = JSON.stringify(items);
+  let saved = false;
+
   try {
-    localStorage.setItem('kiririn_items', JSON.stringify(items));
-    autoBackup();
+    localStorage.setItem('kiririn_items', data);
+    saved = true;
   } catch (e) {
-    alert('⚠️ 保存に失敗しました: ' + e.message);
+    const isQuota = e.name === 'QuotaExceededError' ||
+      (e.message && e.message.toLowerCase().includes('quota'));
+    if (isQuota) {
+      // 古いバックアップをすべて削除してスペースを確保し再試行
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('kiririn_auto_backup_'))
+        .forEach(k => localStorage.removeItem(k));
+      try {
+        localStorage.setItem('kiririn_items', data);
+        saved = true;
+      } catch (e2) {
+        alert('⚠️ 保存に失敗しました（容量不足）\n古いバックアップを削除しましたが、まだ容量が足りません。\n設定 → JSONエクスポートでバックアップ後、データを整理してください。');
+      }
+    } else {
+      alert('⚠️ 保存に失敗しました: ' + e.message);
+    }
   }
+
+  if (saved) autoBackup();
   render();
 }
 
@@ -1195,7 +1215,22 @@ function renderList() {
   // ストア・カテゴリフィルターの選択肢を更新
   updateFilterOptions();
 
-  const list = getFilteredItems(currentTab);
+  // フィルター後にソート
+  // 未出品・出品済み → 管理番号順（番号なしは末尾）
+  // 販売済み        → 販売日の新しい順
+  const rawList = getFilteredItems(currentTab);
+  const list = [...rawList].sort((a, b) => {
+    if (currentTab === 'sold') {
+      const da = a.soldAt || '0', db = b.soldAt || '0';
+      return db.localeCompare(da);                         // 新しい順
+    } else {
+      const ma = a.managementNo || '', mb = b.managementNo || '';
+      if (!ma && !mb) return 0;
+      if (!ma) return 1;                                   // 番号なしは末尾
+      if (!mb) return -1;
+      return ma.localeCompare(mb, 'ja', { numeric: true }); // 数値を考慮した昇順
+    }
+  });
   const total = items.filter(x => x.status === currentTab).length;
   document.getElementById('itemCountLabel').textContent =
     list.length < total ? `${list.length}件（全${total}件中）` : `${list.length}件`;
@@ -1628,7 +1663,24 @@ function openSettings() {
 function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
 
 function exportJSON() {
-  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+  // 写真をitemsに付加してフルバックアップ
+  const exportData = items.map(x => {
+    const photos = photosCache[x.id];
+    return photos && photos.length ? { ...x, photos } : { ...x };
+  });
+  const json    = JSON.stringify(exportData, null, 2);
+  const sizeMB  = (json.length * 2 / 1024 / 1024).toFixed(1);
+  const photoCt = exportData.filter(x => x.photos && x.photos.length).length;
+
+  if (!confirm(
+    `📦 JSONバックアップをダウンロードします\n` +
+    `・商品数: ${exportData.length}件\n` +
+    `・写真あり: ${photoCt}件（写真なし: ${exportData.length - photoCt}件）\n` +
+    `・ファイルサイズ: 約${sizeMB}MB\n\n` +
+    `続けますか？`
+  )) return;
+
+  const blob = new Blob([json], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), {
     href:     url,
@@ -1647,11 +1699,33 @@ function importJSON(input) {
       const data = JSON.parse(e.target.result);
       if (!Array.isArray(data)) throw new Error('不正なフォーマット');
       if (!confirm(`${data.length}件のデータを読み込みます。\n現在のデータと結合します（重複はスキップ）。よろしいですか？`)) return;
+
       const existingIds = new Set(items.map(x => x.id));
-      const newItems = data.filter(x => !existingIds.has(x.id));
+
+      // 写真をlocalStorageに含めないようにIndexedDBへ移行（容量超過防止）
+      const newItems = data
+        .filter(x => !existingIds.has(x.id))
+        .map(x => {
+          // photos配列がある場合（旧形式）→ IndexedDBへ移してitemsからは除去
+          if (x.photos && x.photos.length) {
+            photosCache[x.id] = x.photos;
+            savePhotos(x.id, x.photos); // 非同期・fire-and-forget
+            delete x.photos;
+          }
+          // 旧旧形式（photo単体）
+          if (x.photo) {
+            photosCache[x.id] = [x.photo];
+            savePhotos(x.id, [x.photo]);
+            delete x.photo;
+          }
+          // ステータスの旧形式変換
+          if (x.status === 'stock') x.status = 'unlisted';
+          return x;
+        });
+
       items = [...items, ...newItems];
       save();
-      alert(`${newItems.length}件を追加しました（重複スキップ：${data.length - newItems.length}件）`);
+      alert(`✅ ${newItems.length}件を追加しました（重複スキップ：${data.length - newItems.length}件）\n※写真はこの端末では表示されません（写真は元の端末のIndexedDBに保存されているため）`);
     } catch (err) {
       alert('読み込み失敗: ' + err.message);
     }
@@ -1985,19 +2059,26 @@ function onEditFeeInput() {
 
 function autoBackup() {
   try {
-    const today      = todayISO();
-    const backupKey  = `kiririn_auto_backup_${today}`;
+    const today     = todayISO();
+    const backupKey = `kiririn_auto_backup_${today}`;
+
+    // 今日のバックアップがすでにあれば上書きのみ（新規作成は抑制して容量節約）
     localStorage.setItem(backupKey, JSON.stringify(items));
 
-    // 30件より古いバックアップを削除
+    // 古いバックアップを削除（7件まで保持・容量節約のため30→7に縮小）
     const backupKeys = Object.keys(localStorage)
       .filter(k => k.startsWith('kiririn_auto_backup_'))
       .sort()
       .reverse(); // 新しい順
-
-    backupKeys.slice(30).forEach(k => localStorage.removeItem(k));
+    backupKeys.slice(7).forEach(k => localStorage.removeItem(k));
   } catch(e) {
-    // バックアップ失敗は無視（localStorage容量不足などを想定）
+    // バックアップ失敗は無視。古いバックアップの削除だけ試みる
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('kiririn_auto_backup_'))
+        .sort().reverse().slice(3)
+        .forEach(k => localStorage.removeItem(k));
+    } catch(e2) {}
   }
 }
 
