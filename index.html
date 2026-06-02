@@ -1052,8 +1052,18 @@ function loadData() {
     }
     return x;
   });
-  // 写真を抜いた軽いデータで上書き保存
-  if (needsSave) localStorage.setItem('kiririn_items', JSON.stringify(items));
+  // 写真を抜いた軽いデータで上書き保存（クォータ超過時はバックアップを削除してリトライ）
+  if (needsSave) {
+    const stripped = JSON.stringify(items);
+    try {
+      localStorage.setItem('kiririn_items', stripped);
+    } catch(e) {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('kiririn_auto_backup_'))
+        .forEach(k => localStorage.removeItem(k));
+      try { localStorage.setItem('kiririn_items', stripped); } catch(e2) {}
+    }
+  }
 }
 
 function loadSettings() {
@@ -1690,6 +1700,22 @@ function exportJSON() {
   URL.revokeObjectURL(url);
 }
 
+// 写真をitemsから剥ぎ取りIndexedDBへ移す共通処理
+function stripPhotosToIDB(x) {
+  const photos = x.photos && x.photos.length ? x.photos
+    : x.photo ? [x.photo] : null;
+  if (photos) {
+    if (!photosCache[x.id] || !photosCache[x.id].length) {
+      photosCache[x.id] = photos;
+      savePhotos(x.id, photos); // 非同期・fire-and-forget
+    }
+    delete x.photos;
+    delete x.photo;
+  }
+  if (x.status === 'stock') x.status = 'unlisted';
+  return x;
+}
+
 function importJSON(input) {
   const file = input.files[0];
   if (!file) return;
@@ -1700,32 +1726,24 @@ function importJSON(input) {
       if (!Array.isArray(data)) throw new Error('不正なフォーマット');
       if (!confirm(`${data.length}件のデータを読み込みます。\n現在のデータと結合します（重複はスキップ）。よろしいですか？`)) return;
 
-      const existingIds = new Set(items.map(x => x.id));
+      // ① 既存アイテムにも写真が残っている場合を全件ストリップ（容量超過の根本原因）
+      items = items.map(stripPhotosToIDB);
 
-      // 写真をlocalStorageに含めないようにIndexedDBへ移行（容量超過防止）
-      const newItems = data
+      // ② インポートデータのうち新規分だけ追加（写真もストリップ）
+      const existingIds = new Set(items.map(x => x.id));
+      const newItems    = data
         .filter(x => !existingIds.has(x.id))
-        .map(x => {
-          // photos配列がある場合（旧形式）→ IndexedDBへ移してitemsからは除去
-          if (x.photos && x.photos.length) {
-            photosCache[x.id] = x.photos;
-            savePhotos(x.id, x.photos); // 非同期・fire-and-forget
-            delete x.photos;
-          }
-          // 旧旧形式（photo単体）
-          if (x.photo) {
-            photosCache[x.id] = [x.photo];
-            savePhotos(x.id, [x.photo]);
-            delete x.photo;
-          }
-          // ステータスの旧形式変換
-          if (x.status === 'stock') x.status = 'unlisted';
-          return x;
-        });
+        .map(stripPhotosToIDB);
 
       items = [...items, ...newItems];
       save();
-      alert(`✅ ${newItems.length}件を追加しました（重複スキップ：${data.length - newItems.length}件）\n※写真はこの端末では表示されません（写真は元の端末のIndexedDBに保存されているため）`);
+
+      const photoCount = data.filter(x =>
+        (x.photos && x.photos.length) || x.photo).length;
+      const photoMsg = photoCount > 0
+        ? `\n📷 写真 ${photoCount}件 → この端末のIndexedDBに保存しました`
+        : '';
+      alert(`✅ ${newItems.length}件を追加しました（重複スキップ：${data.length - newItems.length}件）${photoMsg}`);
     } catch (err) {
       alert('読み込み失敗: ' + err.message);
     }
