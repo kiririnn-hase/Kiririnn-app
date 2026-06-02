@@ -1033,6 +1033,33 @@ async function loadAllPhotosToCache() {
   } catch(e) { /* IndexedDB不可環境では無視 */ }
 }
 
+// 1件だけ遅延読み込み（1000件対応：必要な写真だけ都度取得）
+async function loadPhotoForItem(id) {
+  if (photosCache[id] !== undefined) return photosCache[id];
+  try {
+    const db = await openPhotoDB();
+    return new Promise(resolve => {
+      const req = db.transaction(IDB_STORE, 'readonly')
+                    .objectStore(IDB_STORE).get(id);
+      req.onsuccess = e => { photosCache[id] = e.target.result || []; resolve(photosCache[id]); };
+      req.onerror   = () => { photosCache[id] = []; resolve([]); };
+    });
+  } catch(e) { photosCache[id] = []; return []; }
+}
+
+// 現在画面に表示中のアイテムの写真だけ非同期で読み込みDOMを更新
+async function loadVisiblePhotos() {
+  const thumbEls = document.querySelectorAll('.thumb[data-item-id]');
+  for (const el of thumbEls) {
+    const id = el.dataset.itemId;
+    if (!id || photosCache[id] !== undefined) continue;
+    const photos = await loadPhotoForItem(id);
+    if (photos && photos.length) {
+      el.innerHTML = `<img src="${photos[0]}" />`;
+    }
+  }
+}
+
 function loadData() {
   const raw = localStorage.getItem('kiririn_items');
   items = raw ? JSON.parse(raw) : [];
@@ -1254,7 +1281,12 @@ function renderList() {
   box.innerHTML = list.map(x => {
     const photos = photosCache[x.id] || [];
     const src    = photos.length ? photos[0] : '';
-    const img    = src ? `<img src="${src}" />` : '<span>No<br>Image</span>';
+    // 未読み込みは⏳プレースホルダー、キャッシュ済みはそのまま表示
+    const img    = src
+      ? `<img src="${src}" />`
+      : photosCache[x.id] === undefined
+        ? '<span style="font-size:14px">⏳</span>'
+        : '<span>No<br>Image</span>';
     const multi  = photos.length > 1
       ? `<span style="font-size:11px;color:var(--muted)">📷${photos.length}</span>` : '';
 
@@ -1289,7 +1321,7 @@ function renderList() {
 
     return `
       <div class="item">
-        <div class="thumb">${img}</div>
+        <div class="thumb" data-item-id="${x.id}">${img}</div>
         <div class="item-main">
           <div>${badge} ${multi}</div>
           <div class="item-name">${mgmtBadge}${x.name || '無題の商品'}</div>
@@ -1298,6 +1330,9 @@ function renderList() {
         </div>
       </div>`;
   }).join('');
+
+  // 表示中アイテムの写真を非同期で遅延読み込み
+  loadVisiblePhotos();
 }
 
 function render() {
@@ -1672,7 +1707,13 @@ function openSettings() {
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
 
-function exportJSON() {
+async function exportJSON() {
+  // エクスポート前に未キャッシュの写真だけ読み込む
+  const unloaded = items.filter(x => photosCache[x.id] === undefined);
+  if (unloaded.length > 0) {
+    await loadAllPhotosToCache();
+  }
+
   // 写真をitemsに付加してフルバックアップ
   const exportData = items.map(x => {
     const photos = photosCache[x.id];
@@ -1687,6 +1728,7 @@ function exportJSON() {
     `・商品数: ${exportData.length}件\n` +
     `・写真あり: ${photoCt}件（写真なし: ${exportData.length - photoCt}件）\n` +
     `・ファイルサイズ: 約${sizeMB}MB\n\n` +
+    `※ 件数が多い場合は時間がかかることがあります\n` +
     `続けますか？`
   )) return;
 
@@ -2012,14 +2054,18 @@ function renderMonthly() {
   listEl.innerHTML = soldThisMonth.map(x => {
     const photos  = photosCache[x.id] || [];
     const src     = photos.length ? photos[0] : '';
-    const img     = src ? `<img src="${src}" />` : '<span style="font-size:9px;color:var(--muted)">No<br>Image</span>';
+    const img     = src
+      ? `<img src="${src}" />`
+      : photosCache[x.id] === undefined
+        ? '<span style="font-size:14px">⏳</span>'
+        : '<span style="font-size:9px;color:var(--muted)">No<br>Image</span>';
     const p       = calcProfit(x);
     const mgmtBadge = x.managementNo ? `<span class="mgmt-no">#${x.managementNo}</span>` : '';
     const brandStr  = x.brand ? ` / ${x.brand}` : '';
     const soldDate  = x.soldAt ? x.soldAt.slice(0,10) : '—';
     return `
       <div class="item">
-        <div class="thumb">${img}</div>
+        <div class="thumb" data-item-id="${x.id}">${img}</div>
         <div class="item-main">
           <div class="item-name">${mgmtBadge}${x.name || '無題の商品'}${brandStr}</div>
           <div class="item-meta">${x.store||'店舗未入力'} / 販売日: ${soldDate}</div>
@@ -2031,6 +2077,9 @@ function renderMonthly() {
         </div>
       </div>`;
   }).join('');
+
+  // 月別ビューの写真も遅延読み込み
+  loadVisiblePhotos();
 }
 
 // ══════════════════════════════════════════
@@ -2218,9 +2267,9 @@ if ('serviceWorker' in navigator) {
 
 async function init() {
   loadSettings();
-  loadData();              // localStorageから商品データ読込＋旧写真をキャッシュへ移行
-  await loadAllPhotosToCache(); // IndexedDBから全写真をキャッシュへ
-  render();
+  loadData();   // localStorageから商品データ読込＋旧写真をキャッシュへ移行
+  render();     // まず即座に表示（写真はプレースホルダー）
+  loadVisiblePhotos(); // 表示中アイテムの写真だけ非同期で読み込む（1000件対応）
 }
 init();
 </script>
