@@ -957,6 +957,13 @@
         <div class="settings-sub" id="dataSummary">—</div>
       </div>
     </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-label" style="color:var(--red)">🚨 ストレージ緊急リセット</div>
+        <div class="settings-sub">保存が失敗し続ける場合に実行。データは消えません（メモリに残っています）</div>
+      </div>
+      <button class="settings-btn" style="background:rgba(239,68,68,.15);color:var(--red);white-space:nowrap" onclick="emergencyStorageReset()">リセット</button>
+    </div>
   </div>
 </div>
 
@@ -984,6 +991,52 @@ let filterCategory = '';
 // ── 手数料自動計算 ──
 let autoFeeActive     = true;   // 販売登録モーダル
 let autoEditFeeActive = true;   // 編集モーダル
+
+// ── ストレージ診断・緊急リセット ──
+function storageInfo() {
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('kiririn_'));
+  let total = 0;
+  keys.forEach(k => { total += (localStorage.getItem(k) || '').length * 2; });
+  return {
+    keys,
+    totalKB: Math.round(total / 1024),
+    itemsKB: Math.round((localStorage.getItem('kiririn_items') || '').length * 2 / 1024),
+    backupCount: keys.filter(k => k.includes('backup')).length,
+  };
+}
+
+function emergencyStorageReset() {
+  const info = storageInfo();
+  const msg =
+    `🚨 ストレージ緊急リセット\n\n` +
+    `現在のkiririn関連データ:\n` +
+    `・合計容量: ${info.totalKB}KB\n` +
+    `・商品データ: ${info.itemsKB}KB\n` +
+    `・バックアップ: ${info.backupCount}件\n\n` +
+    `localStorage上のkiririn関連データをすべて削除します。\n` +
+    `※ 商品データ(${items.length}件)はこのウィンドウを閉じなければメモリに残っています。\n` +
+    `リセット後すぐに「設定 → JSONエクスポート」でバックアップを取ることを推奨します。\n\n` +
+    `実行しますか？`;
+
+  if (!confirm(msg)) return;
+
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('kiririn_'))
+    .forEach(k => localStorage.removeItem(k));
+
+  // 設定だけ再保存
+  try { localStorage.setItem('kiririn_settings', JSON.stringify(settings)); } catch(e) {}
+
+  // クリーンな状態でitemsを再保存
+  const data = JSON.stringify(items);
+  try {
+    localStorage.setItem('kiririn_items', data);
+    alert(`✅ リセット完了。${items.length}件のデータを再保存しました。`);
+  } catch(e) {
+    alert(`⚠️ リセットしましたが再保存も失敗しました。\n今すぐJSONエクスポートしてください。`);
+  }
+  renderStats();
+}
 
 // ══════════════════════════════════════════
 //  IndexedDB（写真専用・容量制限ほぼなし）
@@ -1099,28 +1152,57 @@ function loadSettings() {
 }
 
 function save() {
+  // ── 保存前に写真を必ずitemsから除去（根本対策）──
+  items = items.map(x => {
+    const photos = x.photos && x.photos.length ? x.photos
+      : x.photo ? [x.photo] : null;
+    if (photos) {
+      if (!photosCache[x.id] || !photosCache[x.id].length) {
+        photosCache[x.id] = photos;
+        savePhotos(x.id, photos);
+      }
+      delete x.photos;
+      delete x.photo;
+    }
+    return x;
+  });
+
   const data = JSON.stringify(items);
+  const sizeKB = Math.round(data.length * 2 / 1024);
   let saved = false;
 
-  try {
-    localStorage.setItem('kiririn_items', data);
+  const tryWrite = () => {
+    try { localStorage.setItem('kiririn_items', data); return true; }
+    catch(e) { return false; }
+  };
+
+  if (tryWrite()) {
     saved = true;
-  } catch (e) {
-    const isQuota = e.name === 'QuotaExceededError' ||
-      (e.message && e.message.toLowerCase().includes('quota'));
-    if (isQuota) {
-      // 古いバックアップをすべて削除してスペースを確保し再試行
-      Object.keys(localStorage)
-        .filter(k => k.startsWith('kiririn_auto_backup_'))
-        .forEach(k => localStorage.removeItem(k));
-      try {
-        localStorage.setItem('kiririn_items', data);
-        saved = true;
-      } catch (e2) {
-        alert('⚠️ 保存に失敗しました（容量不足）\n古いバックアップを削除しましたが、まだ容量が足りません。\n設定 → JSONエクスポートでバックアップ後、データを整理してください。');
-      }
+  } else {
+    // ① バックアップを全削除して再試行
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('kiririn_auto_backup_'))
+      .forEach(k => localStorage.removeItem(k));
+    if (tryWrite()) {
+      saved = true;
     } else {
-      alert('⚠️ 保存に失敗しました: ' + e.message);
+      // ② kiririn関連キーをすべて削除して再試行（最終手段）
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('kiririn_'))
+        .forEach(k => localStorage.removeItem(k));
+      if (tryWrite()) {
+        saved = true;
+        // 設定だけ再保存
+        try { localStorage.setItem('kiririn_settings', JSON.stringify(settings)); } catch(e) {}
+      } else {
+        alert(
+          `⚠️ 保存に失敗しました\n` +
+          `データサイズ: ${sizeKB}KB\n\n` +
+          `対処方法:\n` +
+          `設定 → 🚨 ストレージ緊急リセット を実行してから\n` +
+          `再度、商品登録してください。`
+        );
+      }
     }
   }
 
