@@ -979,6 +979,14 @@ let currentTab = 'unlisted';
 let editingPhotos = [];   // 編集モーダル内の写真配列（参照渡し用）
 let photosCache = {};     // { itemId: [base64, ...] } — IndexedDBの写真キャッシュ
 
+// ── 保存対象フィールド（写真を完全排除・ホワイトリスト方式）──
+const SAVE_FIELDS = [
+  'id','status','name','managementNo','brand','category',
+  'estimatedSize','labeledSize','color','material','condition','memo',
+  'store','cost','targetPrice','fromShelf','measurements',
+  'createdAt','listedAt','soldAt','salePrice','fee','shipping'
+];
+
 // ── 月別ビュー ──
 let selectedYear  = new Date().getFullYear();
 let selectedMonth = new Date().getMonth() + 1;
@@ -1152,8 +1160,9 @@ function loadSettings() {
 }
 
 function save() {
-  // ── 保存前に写真を必ずitemsから除去（根本対策）──
-  items = items.map(x => {
+  // ── ホワイトリスト方式：定義済みフィールドのみ保存（写真は構造上入らない）──
+  // 写真フィールドがitemsに残っていたらIndexedDBに退避
+  items.forEach(x => {
     const photos = x.photos && x.photos.length ? x.photos
       : x.photo ? [x.photo] : null;
     if (photos) {
@@ -1161,13 +1170,14 @@ function save() {
         photosCache[x.id] = photos;
         savePhotos(x.id, photos);
       }
-      delete x.photos;
-      delete x.photo;
     }
-    return x;
   });
 
-  const data = JSON.stringify(items);
+  const data = JSON.stringify(items.map(x => {
+    const clean = {};
+    SAVE_FIELDS.forEach(f => { if (x[f] !== undefined) clean[f] = x[f]; });
+    return clean;
+  }));
   const sizeKB = Math.round(data.length * 2 / 1024);
   let saved = false;
 

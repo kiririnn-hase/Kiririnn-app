@@ -1,5 +1,5 @@
 // キリリンSHOP管理 Service Worker
-const CACHE = 'kiririn-v1';
+const CACHE = 'kiririn-v2';  // ← バージョンを上げると古いキャッシュが自動削除される
 const ASSETS = ['./index.html', './manifest.json', './sw.js'];
 
 self.addEventListener('install', e => {
